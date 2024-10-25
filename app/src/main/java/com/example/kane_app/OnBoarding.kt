@@ -1,5 +1,6 @@
 package com.example.kane_app
 
+import android.app.Activity
 import android.content.ContentValues.TAG
 import android.content.Intent
 import android.os.Bundle
@@ -27,71 +28,88 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import androidx.navigation.NavController
-import androidx.navigation.fragment.findNavController
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class OnBoarding : Fragment() {
-    private var _googleSignInClient: GoogleSignInClient? = null
-    private val googleSignInClient get() = _googleSignInClient
-    private var _auth: FirebaseAuth? = null
-    private val auth get() = _auth
-    private var _navController: NavController? = null
-    private val navController get() = _navController
+    private lateinit var googleSignInClient: GoogleSignInClient
+    private lateinit var auth: FirebaseAuth
+    private lateinit var navController: NavController
 
     companion object {
         private const val RC_SIGN_IN = 9001
-        private const val TAG = "OnBoarding"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        try {
-            _auth = FirebaseAuth.getInstance()
-            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(getString(R.string.default_web_client_id))
-                .requestEmail()
-                .build()
-            _googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso)
-        } catch (e: Exception) {
-            Log.e(TAG, "Initialization error", e)
-        }
+        auth = FirebaseAuth.getInstance()
+        Log.d(TAG, "onCreate: Firebase Auth initialized")
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                OnboardingScreen(navController!!)
+    private fun checkGooglePlayServices(): Boolean {
+        val googleApiAvailability = GoogleApiAvailability.getInstance()
+        val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(requireContext())
+        return if (resultCode != ConnectionResult.SUCCESS) {
+            if (googleApiAvailability.isUserResolvableError(resultCode)) {
+                googleApiAvailability.getErrorDialog(requireActivity(), resultCode, 2404)?.show()
             }
+            false
+        } else {
+            true
         }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        try {
-            _navController = findNavController()
-        } catch (e: Exception) {
-            Log.e(TAG, "NavController initialization error", e)
+
+        // Check for Google Play Services
+        if (!checkGooglePlayServices()) {
+            Log.e(TAG, "Google Play Services not available.")
+            return
+        }
+
+        // Initialize GoogleSignInClient
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id)) // Ensure this ID is correct
+            .requestEmail()
+            .build()
+
+        googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso)
+        Log.d(TAG, "GoogleSignInClient initialized in onViewCreated")
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View? {
+        // Return a ComposeView with the UI
+        return ComposeView(requireContext()).apply {
+            setContent {
+                OnboardingScreen(navController) // Pass navController here
+            }
+        }
+    }
+
+    private fun signInWithGoogle() {
+        if (::googleSignInClient.isInitialized) {
+            Log.d(TAG, "Starting Google Sign-In")
+            val signInIntent = googleSignInClient.signInIntent
+            startActivityForResult(signInIntent, RC_SIGN_IN)
+        } else {
+            Log.e(TAG, "GoogleSignInClient is not initialized in signInWithGoogle()")
         }
     }
 
     @Composable
     fun OnboardingScreen(navController: NavController) {
+        this.navController = navController
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -133,7 +151,7 @@ class OnBoarding : Fragment() {
 
             // Button Gmail
             Button(
-                onClick = { signInWithGoogle() },
+                onClick = { signInWithGoogle() },  // Call Google Sign-In
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
@@ -204,58 +222,5 @@ class OnBoarding : Fragment() {
 
             Spacer(modifier = Modifier.height(16.dp))
         }
-    }
-
-    private fun signInWithGoogle() {
-        googleSignInClient?.let { client ->
-            val signInIntent = client.signInIntent
-            startActivityForResult(signInIntent, RC_SIGN_IN)
-        } ?: run {
-            Log.e(TAG, "GoogleSignInClient is not initialized")
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == RC_SIGN_IN) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            handleSignInResult(task)
-        }
-    }
-
-    private fun handleSignInResult(completedTask: Task<GoogleSignInAccount>) {
-        try {
-            val account = completedTask.getResult(ApiException::class.java)!!
-            // Google Sign-In was successful, authenticate with Firebase
-            firebaseAuthWithGoogle(account)
-        } catch (e: ApiException) {
-            Log.w(TAG, "Google sign in failed", e)
-        }
-    }
-
-    private fun firebaseAuthWithGoogle(account: GoogleSignInAccount) {
-        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-        auth?.signInWithCredential(credential)
-            ?.addOnCompleteListener(requireActivity()) { task ->
-                if (task.isSuccessful) {
-                    // Sign-in successful, navigate to home
-                    navController?.navigate("home")
-                } else {
-                    // Handle sign-in failure
-                    Log.w(TAG, "signInWithCredential:failure", task.exception)
-                }
-            }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _navController = null
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        _googleSignInClient = null
-        _auth = null
     }
 }
