@@ -37,6 +37,7 @@ class HomeFragment : Fragment() {
         }
     }
 
+    //Content Home
     @Composable
     fun HomeContent() {
         Column(

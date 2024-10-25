@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavHostController
 
+//Content Settings
 @Composable
 fun SettingsScreen(navController: NavHostController) {
     Scaffold(

@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavHostController
 
+//Content Budget
 @Composable
 fun BudgetingScreen(navController: NavHostController) {
     Scaffold(
