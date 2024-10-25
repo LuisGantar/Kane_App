@@ -10,12 +10,18 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,6 +50,7 @@ class OnBoarding : Fragment() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var auth: FirebaseAuth
     private lateinit var navController: NavController
+
 
     companion object {
         private const val RC_SIGN_IN = 9001
@@ -110,118 +117,159 @@ class OnBoarding : Fragment() {
 
     @Composable
     fun OnboardingScreen(navController: NavController) {
+        val showDevelopmentCard = remember { mutableStateOf(false) }
         this.navController = navController
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Icon
-            Image(
-                painter = painterResource(id = R.drawable.icondompet),
-                contentDescription = "Coin Illustration",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .size(500.dp)
-                    .padding(top = 44.dp)
-            )
-            // Main text
-            Text(
-                text = "Manage money",
-                fontSize = 35.sp,
-                color = Color.Black,
-                textAlign = TextAlign.Left,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 16.dp)
-            )
-            Text(
-                text = "anytime, anywhere",
-                fontSize = 35.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                textAlign = TextAlign.Left,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 16.dp)
-            )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Button Gmail
-            Button(
-                onClick = { signInWithGoogle() },  // Call Google Sign-In
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .height(60.dp)
-                    .padding(vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = R.drawable.google),
-                        contentDescription = "Google Icon",
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Continue with Google",
-                        color = Color.White,
-                        fontSize = 18.sp
-                    )
-                }
-            }
-
-            // Button Email
-            Button(
-                onClick = { navController.navigate("input_email") },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .height(60.dp)
-                    .padding(vertical = 4.dp),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_mail),
-                        contentDescription = "Email Icon",
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Continue with Email",
-                        color = Color.White,
-                        fontSize = 18.sp
-                    )
-                }
-            }
-
-            // Footer text (terms of service)
+        Box(modifier = Modifier.fillMaxSize()) {  // Tambahkan Box sebagai root
             Column(
                 modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(0.9f),
+                    .fillMaxSize()
+                    .background(Color.White),
+                verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Icon
+                Image(
+                    painter = painterResource(id = R.drawable.icondompet),
+                    contentDescription = "Coin Illustration",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(500.dp)
+                        .padding(top = 44.dp)
+                )
+                // Main text
                 Text(
-                    text = "By signing up, you agree to our",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center
+                    text = "Manage money",
+                    fontSize = 35.sp,
+                    color = Color.Black,
+                    textAlign = TextAlign.Left,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp)
                 )
                 Text(
-                    text = "terms of use, privacy policy, and cookie policy.",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center
+                    text = "anytime, anywhere",
+                    fontSize = 35.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    textAlign = TextAlign.Left,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp)
                 )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Button Gmail
+                Button(
+                    onClick = { showDevelopmentCard.value = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(60.dp)
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.google),
+                            contentDescription = "Google Icon",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Continue with Google",
+                            color = Color.White,
+                            fontSize = 18.sp
+                        )
+                    }
+                }
+
+                // Button Email
+                Button(
+                    onClick = { navController.navigate("input_email") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .height(60.dp)
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_mail),
+                            contentDescription = "Email Icon",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Continue with Email",
+                            color = Color.White,
+                            fontSize = 18.sp
+                        )
+                    }
+                }
+
+                // Footer text (terms of service)
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(0.9f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "By signing up, you agree to our",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "terms of use, privacy policy, and cookie policy.",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Overlay card hover
+            if (showDevelopmentCard.value) {
+                Card(
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .padding(16.dp)
+                        .align(Alignment.Center)
+                        .background(Color.White.copy(alpha = 0.9f))  // Semi-transparan background
+                ) {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        // Close icon at the top right corner
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_close),
+                            contentDescription = "Close Icon",
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(24.dp)
+                                .clickable { showDevelopmentCard.value = false }
+                        )
+
+                        // Card content text
+                        Text(
+                            text = "Fitur ini masih dalam proses pengembangan",
+                            fontSize = 16.sp,
+                            color = Color.Black,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
         }
     }
+
 }
