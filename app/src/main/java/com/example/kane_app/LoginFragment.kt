@@ -28,6 +28,9 @@ class LoginFragment : Fragment() {
         var passwordVisible by remember { mutableStateOf(false) }
         val isButtonEnabled by derivedStateOf { password.isNotEmpty() }
 
+        // Ambil email pengguna yang sudah login
+        val email = firebaseAuth.currentUser?.email ?: ""
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -73,6 +76,7 @@ class LoginFragment : Fragment() {
                     .padding(start = 16.dp, top = 8.dp, bottom = 32.dp)
             )
 
+            // Tampilkan email pengguna yang sudah login
             TextField(
                 value = email,
                 onValueChange = {},
@@ -80,7 +84,7 @@ class LoginFragment : Fragment() {
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .padding(vertical = 8.dp),
-                enabled = false
+                enabled = false // Email hanya ditampilkan, tidak bisa diubah
             )
             Spacer(modifier = Modifier.height(20.dp))
 

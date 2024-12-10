@@ -75,6 +75,7 @@ class RegisterFragment: Fragment() {
                     .padding(start = 16.dp, top = 8.dp, bottom = 32.dp)
             )
 
+            // Tampilkan email pengguna yang sudah diterima
             TextField(
                 value = email,
                 onValueChange = {},
@@ -82,7 +83,7 @@ class RegisterFragment: Fragment() {
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .padding(vertical = 8.dp),
-                enabled = false
+                enabled = false // Email hanya ditampilkan, tidak bisa diubah
             )
             Spacer(modifier = Modifier.height(20.dp))
 

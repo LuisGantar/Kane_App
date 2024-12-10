@@ -21,9 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import androidx.navigation.NavHostController
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import java.util.Date
 
 class HomeFragment : Fragment() {
 
@@ -124,27 +126,38 @@ class HomeFragment : Fragment() {
     @Composable
     fun WalletList(navController: NavHostController) {
         val db = FirebaseFirestore.getInstance()
+        val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email
         var wallets by remember { mutableStateOf<List<Wallet>>(emptyList()) }
         var loading by remember { mutableStateOf(true) }
 
-        LaunchedEffect(Unit) {
-            db.collection("wallets").get()
-                .addOnSuccessListener { result ->
-                    wallets = result.map { document ->
-                        Wallet(
-                            initialBalance = document.get("initialBalance")
-                                .toString(), // Use get() to handle different types
-                            balance = document.getDouble("balance") ?: 0.0,
-                            eWalletType = document.getString("eWalletType") ?: "Unknown",
-                            walletName = document.getString("walletName") ?: "Unnamed Wallet"
-                        )
+        // Periksa jika email pengguna null
+        if (currentUserEmail != null) {
+            LaunchedEffect(currentUserEmail) {
+                // Mengambil wallet berdasarkan userEmail
+                db.collection("users")
+                    .document(currentUserEmail)
+                    .collection("wallets")
+                    .get()
+                    .addOnSuccessListener { result ->
+                        wallets = result.map { document ->
+                            Wallet(
+                                walletId = document.id,
+                                initialBalance = document.getString("initialBalance") ?: "IDR",
+                                balance = document.getDouble("balance") ?: 0.0,
+                                eWalletType = document.getString("eWalletType") ?: "Unknown",
+                                walletName = document.getString("walletName") ?: "Unnamed Wallet"
+                            )
+                        }
+                        loading = false
                     }
-                    loading = false
-                }
-                .addOnFailureListener {
-                    loading = false
-                    // Handle error (optional)
-                }
+                    .addOnFailureListener {
+                        loading = false
+                        // Handle error (optional)
+                    }
+            }
+        } else {
+            // Handle error jika email pengguna tidak tersedia
+            loading = false
         }
 
         if (loading) {
@@ -161,13 +174,13 @@ class HomeFragment : Fragment() {
                         }
 
                         // Navigasi menggunakan navigationPoint yang ditentukan
-                        navController.navigate("walletDetails/$navigationPoint")
+                        val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: ""
+                        navController.navigate("walletDetails/${userEmail}/${selectedWallet.walletName}/${selectedWallet.eWalletType}")
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
-
     }
 
 
@@ -247,6 +260,7 @@ class HomeFragment : Fragment() {
 }
 
 data class Wallet(
+    var walletId : String = "",
     var walletName: String = "",
     var eWalletType: String = "",
     var balance: Double = 0.0,

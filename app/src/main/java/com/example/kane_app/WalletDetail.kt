@@ -26,43 +26,89 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 @Composable
-fun WalletDetailScreen(navController: NavHostController, wallet: Wallet) {
-    val transactions = remember { mutableStateListOf<Transaction>() } // List to hold transactions
-    val isLoading = remember { mutableStateOf(true) } // Loading state for transactions
+fun WalletDetailScreen(navController: NavHostController, walletName: String, userEmail: String, eWalletType: String) {
+    val balance = remember { mutableStateOf(0.0) }
+    val transactions = remember { mutableStateListOf<Transaction>() }
+    val isLoading = remember { mutableStateOf(false) }
+    val errorMessage = remember { mutableStateOf("") }
+    val wallet = remember { mutableStateOf<Wallet?>(null) }
+    val eWalletType = remember { mutableStateOf("") }
+    val walletId = remember { mutableStateOf("") }
+    val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email
 
-    LaunchedEffect(wallet.walletName) {
+
+    LaunchedEffect(walletName) {
         val db = FirebaseFirestore.getInstance()
 
-        // Fetch transactions related to the wallet
-        db.collection("transactions")
-            .whereEqualTo("walletName", wallet.walletName) // Assuming transactions have walletName field
+        // Fetch the wallet data using the userEmail and walletName
+        val walletDoc = db.collection("users").document(userEmail)
+            .collection("wallets")
+            .whereEqualTo("walletName", walletName)
             .get()
-            .addOnSuccessListener { querySnapshot ->
-                transactions.clear() // Clear existing transactions
-                for (document in querySnapshot.documents) {
-                    val transaction = document.toObject(Transaction::class.java)
-                    transaction?.let {
-                        // Get the Timestamp and convert it to Date
-                        val timestamp = document.getTimestamp("date")
-                        it.date = timestamp?.toDate() ?: Date() // Convert Timestamp to Date
-                        transactions.add(it) // Add each transaction to the list
-                    }
-                }
-                isLoading.value = false // Set loading to false once data is fetched
-            }
-            .addOnFailureListener {
-                isLoading.value = false // Set loading to false on failure
-                // Handle the error if necessary
-            }
-    }
 
+        walletDoc.addOnSuccessListener { result ->
+            if (result.isEmpty) {
+                errorMessage.value = "Wallet not found"
+                isLoading.value = false
+                return@addOnSuccessListener
+            }
+
+            val walletData = result.documents.firstOrNull()?.toObject(Wallet::class.java)
+            walletData?.let {
+                wallet.value = it // Assign wallet to state
+                balance.value = it.balance
+
+                // Now fetch transactions from the correct walletId
+                val transactionsRef = db.collection("users")
+                    .document(userEmail)
+                    .collection("wallets")
+                    .document(it.walletId)
+                    .collection("transactions")
+                    .orderBy("date", com.google.firebase.firestore.Query.Direction.DESCENDING)
+
+                transactionsRef.get()
+                    .addOnSuccessListener { querySnapshot ->
+                        transactions.clear()
+                        var updatedBalance = it.balance
+                        for (document in querySnapshot.documents) {
+                            // Use safe type casting and null coalescing
+                            val transactionData = document.data
+                            if (transactionData != null) {
+                                val transaction = Transaction(
+                                    date = (transactionData["date"] as? com.google.firebase.Timestamp)?.toDate() ?: Date(),
+                                    name = transactionData["name"] as? String ?: "",
+                                    type = transactionData["type"] as? String ?: "",
+                                    amount = (transactionData["amount"] as? Number)?.toDouble() ?: 0.0
+                                )
+
+                                transactions.add(transaction)
+                                if (transaction.type == "Pemasukan") {
+                                    updatedBalance += transaction.amount
+                                } else if (transaction.type == "Pengeluaran") {
+                                    updatedBalance -= transaction.amount
+                                }
+                            }
+                        }
+                        balance.value = updatedBalance
+                        isLoading.value = false
+                    }
+                    .addOnFailureListener {
+                        isLoading.value = false
+                        errorMessage.value = "Failed to load transactions. Please try again."
+                    }
+            }
+        }
+    }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         // Back Button to Home
-        IconButton(onClick = { navController.navigate("home") }) { // Navigasi ke layar home
+        IconButton(onClick = { navController.navigate("home") }) {
             Icon(painter = painterResource(R.drawable.ic_back), contentDescription = "Back to Home")
         }
 
@@ -75,7 +121,7 @@ fun WalletDetailScreen(navController: NavHostController, wallet: Wallet) {
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "IDR ${wallet.balance}",
+            text = "IDR ${balance.value}", // Display the correct balance value
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold
         )
@@ -83,42 +129,24 @@ fun WalletDetailScreen(navController: NavHostController, wallet: Wallet) {
         Spacer(modifier = Modifier.height(24.dp))
 
         // Add Transaction Button
-        Button(
-            onClick = {
-                val db = FirebaseFirestore.getInstance()
-                // Pastikan walletName yang digunakan adalah field di dalam dokumen dan bukan nama dokumen
-                db.collection("wallets")
-                    .whereEqualTo("walletName", wallet.walletName)
-                    .whereEqualTo("eWalletType", wallet.eWalletType)
-                    .get()
-                    .addOnSuccessListener { querySnapshot ->
-                        if (!querySnapshot.isEmpty) {
-                            val walletDocument = querySnapshot.documents.firstOrNull()
-                            val walletData = walletDocument?.toObject(Wallet::class.java)
-                            if (walletData != null) {
-                                navController.navigate("add_transaction/${walletData.walletName}/${walletData.eWalletType}") {
-                                    launchSingleTop = true
-                                }
-                            }
-                        }
-                    }
-                    .addOnFailureListener {
-                        // Tangani kegagalan pengambilan data jika perlu
-                    }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
-        ) {
-            Text("Add Transaction")
+        wallet.value?.let { walletData ->
+            Button(
+                onClick = {
+                    // Navigate only if wallet is not null
+                    navController.navigate("add_transaction/$walletName/$eWalletType") // Navigate to AddTransactionScreen
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            ) {
+                Text("Add Transaction")
+            }
         }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // Transaction Details
         Text(text = "Transaction Details", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-
-        if (isLoading.value) {
-            Text("Loading transactions...") // Display loading message
-        } else if (transactions.isEmpty()) {
+        if (transactions.isEmpty()) {
             Text("No transactions added.")
         } else {
             LazyColumn {
@@ -134,17 +162,16 @@ fun WalletDetailScreen(navController: NavHostController, wallet: Wallet) {
 fun TransactionCard(transaction: Transaction) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Removed date display
             Text("Name: ${transaction.name}")
             Text("Type: ${transaction.type}")
             Text("Amount: IDR ${transaction.amount}")
+            Text("Date: ${transaction.date}")
         }
     }
 }
 
-// Transaction data class
 data class Transaction(
-    var date: Date = Date(),  // Ganti menjadi var agar bisa dimodifikasi
+    var date: Date = Date(),
     val name: String = "",
     val type: String = "",
     val amount: Double = 0.0

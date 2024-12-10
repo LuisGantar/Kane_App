@@ -26,11 +26,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 
 class MainActivity : ComponentActivity() {
@@ -51,6 +53,8 @@ fun MyApp() {
     val firestore = FirebaseFirestore.getInstance()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val budgets = remember { mutableStateListOf<Budget>() }
+    val userEmail = firebaseAuth.currentUser?.email ?: ""
 
     Scaffold(
         bottomBar = {
@@ -119,87 +123,43 @@ fun MyApp() {
                 }
 
                 composable("home") { HomeFragment().HomeScreen(navController) }
-                composable("budgeting") { BudgetingScreen(navController) }
+                composable("budgeting") { BudgetingScreen(navController, userEmail = userEmail) }
                 composable("add") { AddScreen(navController) }
                 composable("insights") { InsightsScreen(navController) }
                 composable("settings") { SettingsScreen(navController) }
 
                 // In your NavHost setup
-                composable("walletDetails/{navigationPoint}") { backStackEntry ->
-                    val navigationPoint = backStackEntry.arguments?.getString("navigationPoint") ?: ""
-                    val db = FirebaseFirestore.getInstance()
-                    var wallet by remember { mutableStateOf<Wallet?>(null) }
-
-                    LaunchedEffect(navigationPoint) {
-                        if (navigationPoint.isNotEmpty()) {
-                            // Mencari wallet berdasarkan tipe
-                            val query = if (navigationPoint in listOf("ShopeePay", "GoPay", "Ovo")) {
-                                db.collection("wallets").whereEqualTo("eWalletType", navigationPoint)
-                            } else {
-                                db.collection("wallets").whereEqualTo("walletName", navigationPoint)
-                            }
-
-                            query.get()
-                                .addOnSuccessListener { result ->
-                                    for (document in result) {
-                                        wallet = Wallet(
-                                            initialBalance = document.get("initialBalance").toString(),
-                                            balance = document.getDouble("balance") ?: 0.0,
-                                            eWalletType = document.getString("eWalletType") ?: "Unknown",
-                                            walletName = document.getString("walletName") ?: "Unnamed Wallet"
-                                        )
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    // Handle the error (optional)
-                                }
-                        }
-                    }
-
-                    // Tampilkan WalletDetailScreen saat wallet sudah dimuat
-                    if (wallet != null) {
-                        WalletDetailScreen(navController, wallet!!)
-                    } else {
-                        // Tampilkan loading spinner atau pesan
-                        CircularProgressIndicator(modifier = Modifier.fillMaxSize())
-                    }
-                }
-
-
-                composable("add_transaction/{walletName}/{eWalletType}") { backStackEntry ->
+                composable("walletDetails/{userEmail}/{walletName}/{eWalletType}") { backStackEntry ->
+                    val userEmail = backStackEntry.arguments?.getString("userEmail") ?: ""
                     val walletName = backStackEntry.arguments?.getString("walletName") ?: ""
                     val eWalletType = backStackEntry.arguments?.getString("eWalletType") ?: ""
 
-                    // Firebase Firestore instance
+                    WalletDetailScreen(navController = navController, walletName, userEmail = userEmail, eWalletType)
+                    // Lakukan query dan pengolahan data seperti sebelumnya
                     val db = FirebaseFirestore.getInstance()
                     var wallet by remember { mutableStateOf<Wallet?>(null) }
 
-                    LaunchedEffect(walletName, eWalletType) {
-                        if (walletName.isNotEmpty() && eWalletType.isNotEmpty()) {
-                            val query = db.collection("wallets")
-                                .whereEqualTo("walletName", walletName)
-                                .whereEqualTo("eWalletType", eWalletType)
-
-                            query.get()
-                                .addOnSuccessListener { result ->
-                                    if (!result.isEmpty) {
-                                        val document = result.documents.firstOrNull()
-                                        wallet = document?.toObject(Wallet::class.java)
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    // Tangani error jika perlu
-                                }
-                        }
-                    }
-
-                    // Tampilkan AddTransactionScreen saat wallet sudah ditemukan
+                    // Tampilkan WalletDetailScreen saat wallet sudah dimuat
                     if (wallet != null) {
-                        AddTransactionScreen(navController, walletName)
+                        WalletDetailScreen(navController, walletName, userEmail, eWalletType)
                     } else {
-                        // Tampilkan loading spinner atau pesan jika wallet tidak ditemukan
-                        CircularProgressIndicator(modifier = Modifier.fillMaxSize())
+                        // Tampilkan loading spinner atau pesan
+
                     }
+                }
+                composable(
+                    "add_transaction/{walletName}/{eWalletType}",
+                    arguments = listOf(
+                        navArgument("walletName") { type = NavType.StringType },
+                        navArgument("eWalletType") { type = NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val walletName = backStackEntry.arguments?.getString("walletName") ?: ""
+                    val eWalletType = backStackEntry.arguments?.getString("eWalletType") ?: ""
+                    AddTransactionScreen(navController, walletName, eWalletType)
+                }
+                composable("create_budget") {
+                    CreateBudgetScreen(navController = navController, budgets = budgets, userEmail = firebaseAuth.currentUser?.email ?: "")
                 }
             }
         }

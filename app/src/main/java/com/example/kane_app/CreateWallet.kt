@@ -13,8 +13,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import java.util.UUID
 import com.example.kane_app.R
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun CreateWalletScreen(
@@ -41,13 +43,25 @@ fun CreateWalletScreen(
             onConfirmClick = {
                 loading = true
                 val jumlahBalanceDouble = jumlahBalance.toDoubleOrNull() ?: 0.0
-                // Check if wallet already exists before saving
-                checkAndSaveWalletToFirestore(db, initialBalance, jumlahBalanceDouble, selectedEWallet, walletName) { success ->
-                    loading = false // Stop loading
+                val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email
+                if (currentUserEmail == null) {
+                    loading = false
+                    return@HeaderSection
+                }
+                // Pastikan Anda memiliki email pengguna atau userId di sini
+                val userEmail = currentUserEmail
+
+                checkAndSaveWalletToFirestore(
+                    db = db,
+                    userEmail = userEmail,
+                    initialBalance = initialBalance,
+                    jumlahBalance = jumlahBalanceDouble,
+                    eWalletType = selectedEWallet,
+                    walletName = walletName
+                ) { success ->
+                    loading = false
                     if (success) {
-                        navController.navigate("home") // Navigate to home on success
-                    } else {
-                        // Handle error (e.g., show a snackbar or a toast)
+                        navController.navigate("home")
                     }
                 }
             }
@@ -210,89 +224,62 @@ fun WalletPreviewCard(initialBalance: String, jumlahBalance: String, eWalletType
 // Update pada fungsi checkAndSaveWalletToFirestore
 fun checkAndSaveWalletToFirestore(
     db: FirebaseFirestore,
+    userEmail: String,
     initialBalance: String,
     jumlahBalance: Double,
     eWalletType: String,
     walletName: String,
     onComplete: (Boolean) -> Unit
 ) {
+    val walletsCollectionRef = db.collection("users")
+        .document(userEmail)
+        .collection("wallets")
+
+    val walletId = UUID.randomUUID().toString() // Generate unique walletId
     val walletData = hashMapOf(
+        "walletId" to walletId,
         "initialBalance" to initialBalance,
-        "balance" to jumlahBalance, // Ensure this is a Double
+        "balance" to jumlahBalance,
         "eWalletType" to eWalletType,
         "walletName" to walletName
     )
 
-    // Check if the wallet already exists
-    if (eWalletType == "Other") {
-        // Query to check for existing wallet based on both eWalletType and walletName
-        db.collection("wallets")
-            .whereEqualTo("eWalletType", eWalletType)
-            .whereEqualTo("walletName", walletName)
-            .get()
-            .addOnSuccessListener { documents ->
-                if (documents.isEmpty()) {
-                    // If no existing wallet, create a new one
-                    db.collection("wallets")
-                        .add(walletData)
-                        .addOnSuccessListener { documentReference ->
-                            println("Wallet added with ID: ${documentReference.id}")
-                            onComplete(true)
-                        }
-                        .addOnFailureListener { e ->
-                            println("Error adding wallet: $e")
-                            onComplete(false)
-                        }
-                } else {
-                    // If wallet exists, you can handle this case if needed
-                    println("Wallet already exists for eWalletType: $eWalletType and walletName: $walletName")
-                    onComplete(false) // Or implement any logic you want here
-                }
-            }
-            .addOnFailureListener { e ->
-                println("Error checking wallet: $e")
-                onComplete(false)
-            }
-    } else {
-        // For other eWallet types, check by eWalletType only
-        db.collection("wallets")
-            .whereEqualTo("eWalletType", eWalletType)
-            .get()
-            .addOnSuccessListener { documents ->
-                if (documents.isEmpty()) {
-                    // If no existing wallet, create a new one
-                    db.collection("wallets")
-                        .add(walletData)
-                        .addOnSuccessListener { documentReference ->
-                            println("Wallet added with ID: ${documentReference.id}")
-                            onComplete(true)
-                        }
-                        .addOnFailureListener { e ->
-                            println("Error adding wallet: $e")
-                            onComplete(false)
-                        }
-                } else {
-                    // If wallet exists, update the balance
-                    val existingWalletId = documents.first().id
-                    val newBalance = (documents.first().getDouble("balance") ?: 0.0) + jumlahBalance;
+    // Logika untuk memeriksa dan menyimpan data ke Firestore
+    walletsCollectionRef
+        .whereEqualTo("walletName", walletName)
+        .get()
+        .addOnSuccessListener { documents ->
+            if (documents.isEmpty()) {
+                // Tambahkan data baru jika tidak ada
+                walletsCollectionRef.document(walletId) // Gunakan walletId sebagai document ID
+                    .set(walletData)
+                    .addOnSuccessListener {
+                        println("Wallet successfully added.")
+                        onComplete(true)
+                    }
+                    .addOnFailureListener { e ->
+                        println("Error adding wallet: $e")
+                        onComplete(false)
+                    }
+            } else {
+                val existingWalletId = documents.first().getString("walletId") ?: ""
+                val newBalance = (documents.first().getDouble("balance") ?: 0.0) + jumlahBalance
 
-                    db.collection("wallets").document(existingWalletId)
-                        .update("balance", newBalance)
-                        .addOnSuccessListener {
-                            println("Wallet updated with ID: $existingWalletId")
-                            onComplete(true)
-                        }
-                        .addOnFailureListener { e ->
-                            println("Error updating wallet: $e")
-                            onComplete(false)
-                        }
-                }
+                // Update data jika wallet sudah ada
+                walletsCollectionRef.document(existingWalletId)
+                    .update("balance", newBalance)
+                    .addOnSuccessListener {
+                        println("Wallet successfully updated.")
+                        onComplete(true)
+                    }
+                    .addOnFailureListener { e ->
+                        println("Error updating wallet: $e")
+                        onComplete(false)
+                    }
             }
-            .addOnFailureListener { e ->
-                println("Error checking wallet: $e")
-                onComplete(false)
-            }
-    }
+        }
+        .addOnFailureListener { e ->
+            println("Error fetching wallets: $e")
+            onComplete(false)
+        }
 }
-
-

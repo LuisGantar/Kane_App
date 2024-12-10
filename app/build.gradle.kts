@@ -61,7 +61,7 @@ android {
 
 dependencies {
     implementation("androidx.compose.ui:ui:1.0.0")
-    implementation ("androidx.compose.material3:material3:1.0.0")
+    implementation("androidx.compose.material3:material3:1.1.0")
     implementation ("androidx.navigation:navigation-compose:2.6.0")
     implementation(platform("com.google.firebase:firebase-bom:33.5.0"))
     implementation(libs.androidx.core.ktx)
@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.androidx.constraintlayout.compose)
+    implementation(libs.androidx.material3.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -85,7 +86,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation ("androidx.compose.material3:material3:<latest-version>")
     implementation ("com.firebaseui:firebase-ui-auth:7.2.0")
-    implementation ("com.google.firebase:firebase-firestore-ktx:24.4.3")
+    implementation ("com.google.firebase:firebase-firestore-ktx:24.5.0")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
